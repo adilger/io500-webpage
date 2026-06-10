@@ -2,8 +2,7 @@
     <p>YOU ARE HERE</p>
 
     <?php
-    $this->Breadcrumbs->add(_('LISTS'), ['controller' => 'releases', 'action' => 'index']);
-    $this->Breadcrumbs->add(strtoupper($submission->information_list_name), ['controller' => 'listings', 'action' => 'list', strtolower($submission->information_list_name), 'io500']);
+    $this->Breadcrumbs->add(strtoupper($submission->release->acronym), ['controller' => 'listings', 'action' => 'list', strtolower($submission->release->acronym), 'io500']);
     $this->Breadcrumbs->add(strtoupper($submission->information_system), ['controller' => 'submissions', 'action' => 'view', $submission->id]);
 
     echo $this->Breadcrumbs->render([], ['separator' => ' / ']);
@@ -197,7 +196,7 @@
                 </div>
 
                 <div class="information-metadata">
-                    <h4>IOR & FIND</h4>
+                    <h4>IOR</h4>
 
                     <table class="tb tb-info">
                         <tr>
@@ -215,10 +214,6 @@
                         <tr>
                             <th><?php echo _('Hard Read') ?></th>
                             <td><?php echo $this->Number->format($submission->ior_hard_read, ['places' => 2, 'precision' => 2]) ?> GiB/s</td>
-                        </tr>
-                        <tr>
-                            <th><?php echo _('Find') ?></th>
-                            <td><?php echo $this->Number->format($submission->find_mixed, ['places' => 2, 'precision' => 2]) ?> kIOP/s</td>
                         </tr>
                     </table>
                 </div>
@@ -254,6 +249,32 @@
                         <tr>
                             <th><?php echo _('Hard Delete') ?></th>
                             <td><?php echo $this->Number->format($submission->mdtest_hard_delete, ['places' => 2, 'precision' => 2]) ?> kIOP/s</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="information-metadata">
+                    <h4>RANDOM</h4>
+
+                    <table class="tb tb-info">
+                        <tr>
+                            <th><?php echo _('4KiB Reads') ?></th>
+                            <td><?php echo $this->Number->format($submission->ior_easy_read_random, ['places' => 2, 'precision' => 2]) ?> GiB/s</td>
+                        </tr>
+                        <tr>
+                            <th>&nbsp;</th>
+                            <td><?php echo $this->Number->format($submission->ior_easy_read_random * 256, ['places' => 2, 'precision' => 2]) ?> kIOP/s</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="information-metadata">
+                    <h4>FIND</h4>
+
+                    <table class="tb tb-info">
+                        <tr>
+                            <th><?php echo _('Find') ?></th>
+                            <td><?php echo $this->Number->format($submission->find_mixed, ['places' => 2, 'precision' => 2]) ?> kIOP/s</td>
                         </tr>
                     </table>
                 </div>

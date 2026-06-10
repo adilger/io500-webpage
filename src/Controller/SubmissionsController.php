@@ -41,7 +41,11 @@ class SubmissionsController extends AppController
      */
     public function view($id = null)
     {
-        $submission = $this->Submissions->get($id);
+        $submission = $this->Submissions->get($id, [
+            'contain' => [
+                'Releases',
+            ],
+        ]);
 
         // We need to fetch the scores
         $score = $this->Submissions->ListingsSubmissions->find('all')
@@ -71,7 +75,7 @@ class SubmissionsController extends AppController
 
         $questionnaire = $this->Submissions->Questionnaires->find('all')
             ->where([
-                'Questionnaires.submission_id' => $submission->id
+                'Questionnaires.submission_id' => $submission->id,
             ])
             ->first();
 
@@ -88,11 +92,15 @@ class SubmissionsController extends AppController
      */
     public function configuration($id = null)
     {
-        $submission = $this->Submissions->get($id);
+        $submission = $this->Submissions->get($id, [
+            'contain' => [
+                'Releases',
+            ],
+        ]);
 
         $questionnaire = $this->Submissions->Questionnaires->find('all')
             ->where([
-                'Questionnaires.submission_id' => $submission->id
+                'Questionnaires.submission_id' => $submission->id,
             ])
             ->first();
 
@@ -101,103 +109,40 @@ class SubmissionsController extends AppController
     }
 
     /**
-     * Graphs method
+     * Graphs method. View-only — data is fetched client-side from /plots/data.json
+     * by webroot/js/plots.js. See templates/Submissions/graphs.php.
      *
      * @return \Cake\Http\Response|null|void Renders view
      */
     public function graphs()
     {
-        $lists = [
-            'sc17',
-            'isc18',
-            'sc18',
-            'isc19',
-            'sc19',
-        ];
-
-        $submissions = $this->Submissions->find('all')
-            ->where([
-                'LOWER(Submissions.information_list_name) IN' => $lists,
-                'Submissions.status_id' => 3,
-            ]);
-
-        $this->set('lists', $lists);
-        $this->set(compact('submissions'));
     }
 
     /**
-     * IOR method
+     * IOR method. View-only — data is fetched client-side from /plots/data.json.
      *
      * @return \Cake\Http\Response|null|void Renders view
      */
     public function ior()
     {
-        $lists = [
-            'sc17',
-            'isc18',
-            'sc18',
-            'isc19',
-            'sc19',
-        ];
-
-        $submissions = $this->Submissions->find('all')
-            ->where([
-                'LOWER(Submissions.information_list_name) IN' => $lists,
-                'Submissions.status_id' => 3,
-            ]);
-
-        $this->set('lists', $lists);
-        $this->set(compact('submissions'));
     }
 
     /**
-     * MDtest method
+     * MDtest method. View-only — data is fetched client-side from /plots/data.json.
      *
      * @return \Cake\Http\Response|null|void Renders view
      */
     public function mdtest()
     {
-        $lists = [
-            'sc17',
-            'isc18',
-            'sc18',
-            'isc19',
-            'sc19',
-        ];
-
-        $submissions = $this->Submissions->find('all')
-            ->where([
-                'LOWER(Submissions.information_list_name) IN' => $lists,
-                'Submissions.status_id' => 3,
-            ]);
-
-        $this->set('lists', $lists);
-        $this->set(compact('submissions'));
     }
 
     /**
-     * Pfind method
+     * Pfind method. View-only — data is fetched client-side from /plots/data.json.
      *
      * @return \Cake\Http\Response|null|void Renders view
      */
     public function pfind()
     {
-        $lists = [
-            'sc17',
-            'isc18',
-            'sc18',
-            'isc19',
-            'sc19',
-        ];
-
-        $submissions = $this->Submissions->find('all')
-            ->where([
-                'LOWER(Submissions.information_list_name) IN' => $lists,
-                'Submissions.status_id' => 3,
-            ]);
-
-        $this->set('lists', $lists);
-        $this->set(compact('submissions'));
     }
 
     /**
@@ -223,6 +168,9 @@ class SubmissionsController extends AppController
 
         // Get columns list from table
         $columns = $tableSchema->columns();
+
+        // Remove private fields to prevent them from being exposed, selected, or used in equations
+        $columns = array_values(array_diff($columns, \App\Model\Table\SubmissionsTable::PRIVATE_FIELDS));
 
         // This column can be used to compute custom metrics, but it will take the initial value from the last historical list
         array_splice($columns, 8, 0, ['io500_score']);
@@ -271,6 +219,9 @@ class SubmissionsController extends AppController
         $equation = false;
         $valid = true;
 
+        $displayPrefixes = \App\Model\Table\SubmissionsTable::DISPLAY_PREFIXES;
+        $extraDisplayFields = \App\Model\Table\SubmissionsTable::EXTRA_DISPLAY_FIELDS;
+
         foreach ($submissions as $submission) {
             // We will use the latest valid score to display
             $submission->submission->io500_score = $submission->score;
@@ -279,6 +230,26 @@ class SubmissionsController extends AppController
 
         if ($this->request->is('post')) {
             $selected_to_display = $this->request->getData();
+
+            // Restrict selected fields to known display prefixes/fields and exclude private fields
+            $selected_to_display['custom-fields'] = array_values(array_filter(
+                array_diff($selected_to_display['custom-fields'], \App\Model\Table\SubmissionsTable::PRIVATE_FIELDS),
+                function ($field) use ($displayPrefixes, $extraDisplayFields) {
+                    // Allow wildcard group options (e.g. "information_*")
+                    if (str_ends_with($field, '*')) {
+                        $prefix = substr($field, 0, -1);
+
+                        return in_array($prefix, $displayPrefixes, true);
+                    }
+                    foreach ($displayPrefixes as $prefix) {
+                        if (str_starts_with($field, $prefix)) {
+                            return true;
+                        }
+                    }
+
+                    return in_array($field, $extraDisplayFields, true);
+                }
+            ));
 
             foreach ($selected_to_display['custom-fields'] as $option) {
                 if (strpos($option, '*') !== false) {
@@ -377,8 +348,17 @@ class SubmissionsController extends AppController
         $options['ior_*'] = 'ior_*';
         $options['find_*'] = 'find_*';
 
-        foreach ($columns as $key => $column) {
-            $options[$column] = $column;
+        foreach ($columns as $column) {
+            $matchesPrefix = false;
+            foreach ($displayPrefixes as $prefix) {
+                if (str_starts_with($column, $prefix)) {
+                    $matchesPrefix = true;
+                    break;
+                }
+            }
+            if ($matchesPrefix || in_array($column, $extraDisplayFields, true)) {
+                $options[$column] = $column;
+            }
         }
 
         $submissions = $submissions->toArray();
